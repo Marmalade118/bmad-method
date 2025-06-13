@@ -1,0 +1,34 @@
+name: Deploy to Azure
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Login to Azure
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Upload Resources to Azure Blob Storage
+        run: |
+          az storage blob upload-batch \
+            --account-name <storage_account> \
+            --destination bmad-resources \
+            --source f:/Code/personal/bmad-method/bmad-agent/
+
+      - name: Deploy Agents to Azure AI Foundry
+        run: |
+          az ai foundry agent deploy \
+            --name analyst-agent \
+            --resource-group <resource_group> \
+            --workspace <workspace> \
+            --file f:/Code/personal/bmad-method/bmad-agent/personas/analyst-agent.agent.yaml

@@ -1,11 +1,11 @@
-architect-checklist:
+- name: architect-checklist
   checklist_file: docs/checklists/architect-checklist.md
   required_docs:
     - architecture.md
   default_locations:
     - docs/architecture.md
 
-frontend-architecture-checklist:
+- name: frontend-architecture-checklist
   checklist_file: docs/checklists/frontend-architecture-checklist.md
   required_docs:
     - frontend-architecture.md
@@ -13,14 +13,14 @@ frontend-architecture-checklist:
     - docs/frontend-architecture.md
     - docs/fe-architecture.md
 
-pm-checklist:
+- name: pm-checklist
   checklist_file: docs/checklists/pm-checklist.md
   required_docs:
     - prd.md
   default_locations:
     - docs/prd.md
 
-po-master-checklist:
+- name: po-master-checklist
   checklist_file: docs/checklists/po-master-checklist.md
   required_docs:
     - prd.md
@@ -32,14 +32,14 @@ po-master-checklist:
     - docs/frontend-architecture.md
     - docs/architecture.md
 
-story-draft-checklist:
+- name: story-draft-checklist
   checklist_file: docs/checklists/story-draft-checklist.md
   required_docs:
     - story.md
   default_locations:
     - docs/stories/*.md
 
-story-dod-checklist:
+- name: story-dod-checklist
   checklist_file: docs/checklists/story-dod-checklist.md
   required_docs:
     - story.md

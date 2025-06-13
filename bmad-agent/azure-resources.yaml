@@ -1,0 +1,9 @@
+resources:
+  tasks:
+    - path: https://<storage_account>.blob.core.windows.net/bmad-resources/tasks/
+  checklists:
+    - path: https://<storage_account>.blob.core.windows.net/bmad-resources/checklists/
+  data:
+    - path: https://<storage_account>.blob.core.windows.net/bmad-resources/data/
+  templates:
+    - path: https://<storage_account>.blob.core.windows.net/bmad-resources/templates/
