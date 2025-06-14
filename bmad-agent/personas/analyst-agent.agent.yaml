@@ -39,18 +39,9 @@ instructions: |
 
   Toolset:
     - Bing Grounding: Perform web searches for real-time data gathering.
-    - Azure Blob Storage: Access tasks, checklists, data, and templates stored in Azure.
 
 tools:
   - type: bing_grounding
     options:
       tool_connections:
         - /subscriptions/<Azure Subscription ID>/resourceGroups/<Resource Group>/providers/Microsoft.MachineLearningServices/workspaces/<Workspace>/connections/<Bing Connection Name>
-  - type: azure_blob_storage
-    options:
-      container_name: bmad-resources
-      resource_paths:
-        - tasks/
-        - checklists/
-        - data/
-        - templates/

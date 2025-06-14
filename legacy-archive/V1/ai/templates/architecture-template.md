@@ -10,18 +10,17 @@ Status: { Draft | Approved }
 
 Table listing choices for languages, libraries, infra, cloud resources, etc... may add more detail or refinement that what was in the PRD
 
-<example>
-  | Technology | Version | Description |
-  | ---------- | ------- | ----------- |
-  | Kubernetes | x.y.z | Container orchestration platform for microservices deployment |
-  | Apache Kafka | x.y.z | Event streaming platform for real-time data ingestion |
-  | TimescaleDB | x.y.z | Time-series database for sensor data storage |
-  | Go | x.y.z | Primary language for data processing services |
-  | GoRilla Mux | x.y.z | REST API Framework |
-  | Python | x.y.z | Used for data analysis and ML services |
-  | DeepSeek LLM | R3 | Ollama local hosted and remote hosted API use for customer chat engagement |
+**Example:**
 
-</example>
+| Technology | Version | Description |
+| ---------- | ------- | ----------- |
+| Kubernetes | x.y.z | Container orchestration platform for microservices deployment |
+| Apache Kafka | x.y.z | Event streaming platform for real-time data ingestion |
+| TimescaleDB | x.y.z | Time-series database for sensor data storage |
+| Go | x.y.z | Primary language for data processing services |
+| GoRilla Mux | x.y.z | REST API Framework |
+| Python | x.y.z | Used for data analysis and ML services |
+| DeepSeek LLM | R3 | Ollama local hosted and remote hosted API use for customer chat engagement |
 
 ## **High-Level Overview**
 
@@ -37,6 +36,7 @@ Identify major logical components/modules/services, outline their responsibiliti
 { Data Models, API Specs, Schemas }
 
 <example>
+**Example:**
 
 ### Dynamo One Table Design for App Table
 
@@ -159,7 +159,7 @@ sequenceDiagram
 
 ## Testing Requirements and Framework
 
-### Patterns and Standards (Opinionated & Specific)
+###  Patterns and Standards (Opinionated & Specific)
 
     - **Architectural/Design Patterns:** Mandate specific patterns to be used (e.g., Repository Pattern for data access, MVC/MVVM for structure, CQRS if applicable). .
 
@@ -169,7 +169,7 @@ sequenceDiagram
 
     - **Error Handling Strategy:** Outline the standard approach for logging errors, propagating exceptions, and formatting error responses.
 
-### Initial Project Setup (Manual Steps)
+###  Initial Project Setup (Manual Steps)
 
 Define Story 0: Explicitly state initial setup tasks for the user. Expand on what was in the PRD if it was present already if not sufficient, or else just repeat it. Examples:
 

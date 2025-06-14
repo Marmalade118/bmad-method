@@ -49,6 +49,15 @@ instructions: |
     - Bing Grounding: Perform web searches for real-time data gathering.
     - Code Interpreter: Execute code snippets for debugging and development.
     - OpenAPI Spec: Integrate APIs for accessing external services.
+    - VS Code Toolsets: Use @dotnetBlazorDeveloper for .NET/Blazor development, @mauiDeveloper for cross-platform mobile development, @dotnetGithubDeveloper for repository operations.
+
+  VS Code Integration:
+    - When working in VS Code, leverage appropriate toolsets based on development context
+    - Blazor/Razor Pages: @dotnetBlazorDeveloper
+    - MAUI Development: @mauiDeveloper  
+    - GitHub Operations: @dotnetGithubDeveloper
+    - Architecture Design: @dotnetArchitect
+    - Component Development: @blazorComponentDeveloper
 
 tools:
   - type: azure_ai_search

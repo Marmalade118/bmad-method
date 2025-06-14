@@ -157,6 +157,7 @@ If the project includes a significant user interface, a separate Frontend Archit
 
 - **Description:** {What does this entity represent?}
 - **Schema / Interface Definition:**
+
   ```typescript
   // Example using TypeScript Interface
   export interface {EntityName} {
@@ -166,6 +167,7 @@ If the project includes a significant user interface, a separate Frontend Archit
     // ... other properties
   }
   ```
+
 - **Validation Rules:** {List any specific validation rules beyond basic types - e.g., max length, format, range.}
 
 ### API Payload Schemas (If distinct)
@@ -175,6 +177,7 @@ If the project includes a significant user interface, a separate Frontend Archit
 #### {API Endpoint / Purpose, e.g., Create Order Request, repeat the section as needed}
 
 - **Schema / Interface Definition:**
+
   ```typescript
   // Example
   export interface CreateOrderRequest {
@@ -192,6 +195,7 @@ If the project includes a significant user interface, a separate Frontend Archit
 
 - **Purpose:** {What data does this table store?}
 - **Schema Definition:**
+
   ```sql
   -- Example SQL
   CREATE TABLE {TableName} (
@@ -201,6 +205,7 @@ If the project includes a significant user interface, a separate Frontend Archit
     -- ... other columns, indexes, constraints
   );
   ```
+
   _(Alternatively, use ORM model definitions, NoSQL document structure, etc.)_
 
 ## Core Workflow / Sequence Diagrams
@@ -217,30 +222,39 @@ Key decisions to discuss and finalize here, which will then be expanded upon and
 
 - Preferred Starter Template Frontend: { Url to template or starter, if used }
 - Preferred Starter Template Backend: { Url to template or starter, if used }
-- Primary Language(s) & Version(s): {e.g., TypeScript 5.x, Python 3.11 - Specify exact versions, e.g., `5.2.3`}
-- Primary Runtime(s) & Version(s): {e.g., Node.js 22.x - Specify exact versions, e.g., `22.0.1`}
+- Primary Language(s) & Version(s): {PREFERRED: C# with .NET 10 (currently in preview, will be LTS), .NET 9 available but not LTS. For web applications, strongly consider Blazor WebAssembly, Server-side, or Hybrid approaches first as they enable seamless Maui integration for native app support. Alternative: TypeScript 5.x, Python 3.11 - Specify exact versions, e.g., `5.2.3`}
+- Primary Runtime(s) & Version(s): {PREFERRED: .NET 10 Runtime (preview, will be LTS) or .NET 9 Runtime. Alternative: Node.js 22.x - Specify exact versions, e.g., `22.0.1`}
 
 Must be definitive selections; do not list open-ended choices (e.g., for web scraping, pick one tool, not two). Specify exact versions (e.g., `18.2.0`). If 'Latest' is used, it implies the latest stable version _at the time of this document's last update_, and the specific version (e.g., `xyz-library@2.3.4`) should be recorded. Pinning versions is strongly preferred to avoid unexpected breaking changes for the AI agent. }
 
 | Category             | Technology              | Version / Details | Description / Purpose                   | Justification (Optional) |
 | :------------------- | :---------------------- | :---------------- | :-------------------------------------- | :----------------------- |
-| **Languages**        | {e.g., TypeScript}      | {e.g., 5.x}       | {Primary language for backend/frontend} | {Why this language?}     |
-|                      | {e.g., Python}          | {e.g., 3.11}      | {Used for data processing, ML}          | {...}                    |
-| **Runtime**          | {e.g., Node.js}         | {e.g., 22.x}      | {Server-side execution environment}     | {...}                    |
-| **Frameworks**       | {e.g., NestJS}          | {e.g., 10.x}      | {Backend API framework}                 | {Why this framework?}    |
-|                      | {e.g., React}           | {e.g., 18.x}      | {Frontend UI library}                   | {...}                    |
-| **Databases**        | {e.g., PostgreSQL}      | {e.g., 15}        | {Primary relational data store}         | {...}                    |
+| **Languages**        | {PREFERRED: C#}         | {e.g., 12.x}      | {Primary language for backend/frontend} | {Unified language across stack, strong typing, performance} |
+|                      | {ALT: TypeScript}       | {e.g., 5.x}       | {Alternative for web applications}      | {If .NET/Blazor not suitable}     |
+| **Runtime**          | {PREFERRED: .NET}       | {e.g., 10 (preview) or 9} | {Cross-platform runtime environment} | {Performance, tooling, LTS roadmap} |
+|                      | {ALT: Node.js}          | {e.g., 22.x}      | {Alternative runtime environment}       | {If .NET not chosen}    |
+| **Web Frameworks**   | {PREFERRED: Blazor Server/WASM/Hybrid} | {e.g., .NET 10} | {Frontend framework enabling Maui integration} | {Unified C# stack, native app potential} |
+|                      | {ALT: ASP.NET Core}     | {e.g., 10.x}      | {Backend API framework}                 | {High performance, cloud-native}    |
+|                      | {ALT: React/Next.js}    | {e.g., 18.x/14.x} | {Alternative frontend if Blazor not suitable} | {If Blazor requirements not met} |
+| **Databases**        | {e.g., SQL Server/PostgreSQL} | {e.g., 2022/15} | {Primary relational data store}       | {Entity Framework integration} |
 |                      | {e.g., Redis}           | {e.g., 7.x}       | {Caching, session storage}              | {...}                    |
-| **Cloud Platform**   | {e.g., AWS}             | {N/A}             | {Primary cloud provider}                | {...}                    |
-| **Cloud Services**   | {e.g., AWS Lambda}      | {N/A}             | {Serverless compute}                    | {...}                    |
-|                      | {e.g., AWS S3}          | {N/A}             | {Object storage for assets/state}       | {...}                    |
-|                      | {e.g., AWS EventBridge} | {N/A}             | {Event bus / scheduled tasks}           | {...}                    |
-| **Infrastructure**   | {e.g., AWS CDK}         | {e.g., Latest}    | {Infrastructure as Code tool}           | {...}                    |
+| **Cloud Platform**   | {PREFERRED: Microsoft Azure} | {N/A}        | {Primary cloud provider}                | {Native .NET integration, AI services} |
+| **Cloud Services**   | {e.g., Azure Functions} | {N/A}             | {Serverless compute}                    | {.NET native support}   |
+|                      | {e.g., Azure Storage}   | {N/A}             | {Object storage for assets/state}       | {Integrated with Azure ecosystem} |
+|                      | {e.g., Azure Service Bus} | {N/A}           | {Event bus / messaging}                 | {Enterprise messaging patterns} |
+| **AI/ML Services**   | {e.g., Azure AI Foundry} | {N/A}            | {AI model deployment and orchestration} | {Integrated AI capabilities} |
+| **Orchestration**    | {e.g., .NET Aspire}     | {e.g., Latest}    | {Cloud-native app orchestration}        | {Simplified cloud development} |
+| **Infrastructure**   | {e.g., Azure Bicep/ARM} | {e.g., Latest}    | {Infrastructure as Code tool}           | {Azure-native IaC}      |
+|                      | {ALT: Terraform}        | {e.g., Latest}    | {Alternative IaC tool}                  | {Multi-cloud support}   |
 |                      | {e.g., Docker}          | {e.g., Latest}    | {Containerization}                      | {...}                    |
-| **UI Libraries**     | {e.g., Material UI}     | {e.g., 5.x}       | {React component library}               | {...}                    |
-| **State Management** | {e.g., Redux Toolkit}   | {e.g., Latest}    | {Frontend state management}             | {...}                    |
-| **Testing**          | {e.g., Jest}            | {e.g., Latest}    | {Unit/Integration testing framework}    | {...}                    |
-|                      | {e.g., Playwright}      | {e.g., Latest}    | {End-to-end testing framework}          | {...}                    |
+| **UI Libraries**     | {PREFERRED: Blazor Components} | {e.g., .NET 10} | {Built-in Blazor component system}     | {Native integration, performance} |
+|                      | {ALT: Material UI}     | {e.g., 5.x}       | {React component library if not using Blazor} | {If React chosen over Blazor} |
+| **State Management** | {PREFERRED: Blazor State} | {e.g., .NET 10} | {Built-in Blazor state management}      | {Simplified state handling} |
+|                      | {ALT: Redux Toolkit}   | {e.g., Latest}    | {Frontend state management for non-Blazor} | {If React/other JS framework chosen} |
+| **Testing**          | {PREFERRED: xUnit}     | {e.g., Latest}    | {Unit testing framework for .NET}       | {Native .NET integration} |
+|                      | {e.g., bUnit}          | {e.g., Latest}    | {Blazor component testing}              | {Blazor-specific testing} |
+|                      | {ALT: Jest}            | {e.g., Latest}    | {Unit/Integration testing for JS/TS}    | {If not using .NET stack} |
+|                      | {e.g., Playwright}     | {e.g., Latest}    | {End-to-end testing framework}          | {Cross-platform E2E testing} |
 | **CI/CD**            | {e.g., GitHub Actions}  | {N/A}             | {Continuous Integration/Deployment}     | {...}                    |
 | **Other Tools**      | {e.g., LangChain.js}    | {e.g., Latest}    | {LLM interaction library}               | {...}                    |
 |                      | {e.g., Cheerio}         | {e.g., Latest}    | {HTML parsing/scraping}                 | {...}                    |
@@ -295,28 +309,39 @@ Must be definitive selections; do not list open-ended choices (e.g., for web scr
 
 {For each primary language and framework selected in the "Definitive Tech Stack Selections", the following specific conventions **must** be adhered to. If a chosen technology is not listed below, it implies adherence to its standard, widely accepted best practices and the general guidelines in this document.}
 
-#### `{Language/Framework 1 Name, e.g., TypeScript/Node.js}` Specifics:
+#### `{Language/Framework 1 Name, e.g., C#/.NET}` Specifics
 
-- **Immutability:** `{e.g., "Always prefer immutable data structures. Use `Readonly\<T\>`, `ReadonlyArray\<T\>`, `as const` for object/array literals. Avoid direct mutation of objects/arrays passed as props or state. Consider libraries like Immer for complex state updates."}`
+- **Immutability:** `{e.g., "Prefer readonly fields and immutable collections (ImmutableList<T>, ImmutableDictionary<K,V>). Use record types for immutable data. Avoid mutable public properties; prefer init-only setters or private setters with constructor initialization."}`
+- **Nullable Reference Types:** `{e.g., "Enable nullable reference types (<Nullable>enable</Nullable>). Use nullable annotations (?, !) appropriately. Prefer explicit null checks over null-forgiving operator (!)."}`
+- **Error Handling Specifics:** `{e.g., "Use custom exception classes inheriting from System.Exception or more specific base exceptions. Implement proper exception constructors. Use Result<T> or Option<T> patterns for expected failures. Log exceptions with structured logging."}`
+- **Async/Await Patterns:** `{e.g., "Always use ConfigureAwait(false) in library code. Avoid async void except for event handlers. Use CancellationToken for long-running operations. Prefer Task.Run for CPU-bound work."}`
+- **Dependency Injection:** `{e.g., "Use Microsoft.Extensions.DependencyInjection. Register services with appropriate lifetimes (Singleton, Scoped, Transient). Prefer constructor injection over property injection."}`
+- **Entity Framework Specifics:** `{e.g., "Use async methods for database operations. Implement proper DbContext lifecycle management. Use Include() for explicit loading, avoid lazy loading in production. Use migrations for schema changes."}`
+- **Blazor Specifics:** `{e.g., "Use @rendermode for appropriate rendering modes (Server, WebAssembly, Auto). Implement proper component lifecycle methods. Use @bind for two-way data binding. Follow component naming conventions (PascalCase)."}`
+- **Coding Standards:** `{e.g., "Follow Microsoft C# coding conventions. Use EditorConfig for consistent formatting. Enable all nullable warnings. Use var only when type is obvious from right side."}`
+
+#### `{Language/Framework 2 Name, e.g., TypeScript/Node.js}` Specifics
+
+- **Immutability:** `{e.g., "Always prefer immutable data structures. Use`Readonly\<T\>`,`ReadonlyArray\<T\>`,`as const`for object/array literals. Avoid direct mutation of objects/arrays passed as props or state. Consider libraries like Immer for complex state updates."}`
 - **Functional vs. OOP:** `{e.g., "Favor functional programming constructs (map, filter, reduce, pure functions) for data transformation and business logic where practical. Use classes for entities, services with clear state/responsibilities, or when framework conventions (e.g., NestJS) demand."}`
-- **Error Handling Specifics:** `{e.g., "Always use `Error`objects or extensions thereof for`throw`. Ensure `Promise`rejections are always`Error`objects. Use custom error classes inheriting from a base`AppError` for domain-specific errors."}`
-- **Null/Undefined Handling:** `{e.g., "Strict null checks (`strictNullChecks`) must be enabled. Avoid `\!` non-null assertion operator; prefer explicit checks, optional chaining (`?.`), or nullish coalescing (`??`). Define clear strategies for optional function parameters and return types."}`
+- **Error Handling Specifics:** `{e.g., "Always use`Error`objects or extensions thereof for`throw`. Ensure`Promise`rejections are always`Error`objects. Use custom error classes inheriting from a base`AppError`for domain-specific errors."}`
+- **Null/Undefined Handling:** `{e.g., "Strict null checks (`strictNullChecks`) must be enabled. Avoid`\!`non-null assertion operator; prefer explicit checks, optional chaining (`?.`), or nullish coalescing (`??`). Define clear strategies for optional function parameters and return types."}`
 - **Module System:** `{e.g., "Use ESModules (`import`/`export`) exclusively. Avoid CommonJS (`require`/`module.exports`) in new code."}`
 - **Logging Specifics:** `{e.g., "Use the chosen structured logging library. Log messages must include a correlation ID. Do not log sensitive PII. Use appropriate log levels."}`
 - **Framework Idioms (e.g., for NestJS/Express):** `{e.g., "NestJS: Always use decorators for defining modules, controllers, services, DTOs. Adhere strictly to the defined module structure and dependency injection patterns. Express: Define middleware patterns, routing structure."}`
-- **Key Library Usage Conventions:** `{e.g., "When using Axios, create a single configured instance. For date/time, use {date-fns/Luxon/Day.js} and avoid native `Date` object for manipulations."}`
-- **Code Generation Anti-Patterns to Avoid:** `{e.g., "Avoid overly nested conditional logic (max 2-3 levels). Avoid single-letter variable names (except for trivial loop counters like `i`, `j`, `k`). Do not write code that bypasses framework security features (e.g., ORM query builders)."}`
+- **Key Library Usage Conventions:** `{e.g., "When using Axios, create a single configured instance. For date/time, use {date-fns/Luxon/Day.js} and avoid native`Date`object for manipulations."}`
+- **Code Generation Anti-Patterns to Avoid:** `{e.g., "Avoid overly nested conditional logic (max 2-3 levels). Avoid single-letter variable names (except for trivial loop counters like`i`,`j`,`k`). Do not write code that bypasses framework security features (e.g., ORM query builders)."}`
 
-#### `{Language/Framework 2 Name, e.g., Python}` Specifics:
+#### `{Language/Framework 2 Name, e.g., Python}` Specifics
 
-- **Immutability:** `{e.g., "Use tuples for immutable sequences. For classes, consider `@dataclass(frozen=True)`. Be mindful of mutable default arguments."}`
-- **Functional vs. OOP:** `{e.g., "Employ classes for representing entities and services. Use functions for stateless operations. List comprehensions/generator expressions are preferred over `map/filter` for readability."}`
-- **Error Handling Specifics:** `{e.g., "Always raise specific, custom exceptions inheriting from a base `AppException`. Use `try-except-else-finally`blocks appropriately. Avoid broad`except Exception:` clauses without re-raising or specific handling."}`
-- **Resource Management:** `{e.g., "Always use `with` statements for resources like files or DB connections to ensure they are properly closed."}`
-- **Type Hinting:** `{e.g., "All new functions and methods must have full type hints. Run MyPy in CI. Strive for `disallow_untyped_defs = True`."}`
-- **Logging Specifics:** `{e.g., "Use the `logging`module configured for structured output (e.g., with`python-json-logger`). Include correlation IDs."}`
+- **Immutability:** `{e.g., "Use tuples for immutable sequences. For classes, consider`@dataclass(frozen=True)`. Be mindful of mutable default arguments."}`
+- **Functional vs. OOP:** `{e.g., "Employ classes for representing entities and services. Use functions for stateless operations. List comprehensions/generator expressions are preferred over`map/filter`for readability."}`
+- **Error Handling Specifics:** `{e.g., "Always raise specific, custom exceptions inheriting from a base`AppException`. Use`try-except-else-finally`blocks appropriately. Avoid broad`except Exception:`clauses without re-raising or specific handling."}`
+- **Resource Management:** `{e.g., "Always use`with`statements for resources like files or DB connections to ensure they are properly closed."}`
+- **Type Hinting:** `{e.g., "All new functions and methods must have full type hints. Run MyPy in CI. Strive for`disallow_untyped_defs = True`."}`
+- **Logging Specifics:** `{e.g., "Use the`logging`module configured for structured output (e.g., with`python-json-logger`). Include correlation IDs."}`
 - **Framework Idioms (e.g., for Django/Flask/FastAPI):** `{e.g., "Django: Follow fat models, thin views pattern. Use ORM conventions. FastAPI: Utilize Pydantic for request/response models and dependency injection for services."}`
-- **Key Library Usage Conventions:** `{e.g., "For HTTP requests, use `httpx`or`requests`with explicit timeout settings. For data manipulation, prefer`pandas` where appropriate but be mindful of performance."}`
+- **Key Library Usage Conventions:** `{e.g., "For HTTP requests, use`httpx`or`requests`with explicit timeout settings. For data manipulation, prefer`pandas`where appropriate but be mindful of performance."}`
 
 #### `{Add more Language/Framework sections as needed...}`
 
