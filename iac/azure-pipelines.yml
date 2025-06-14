@@ -1,0 +1,268 @@
+name: $(SourceBranchName)$(Rev:.r)
+
+#   !!! Pipeline variables used: these are defined in Azure DevOps and are only referenced by the YAML pipeline. !!!
+#
+#   productionSqlServerAdminPassword - sets the admin password used in production for the sql server database.
+#   developmentSqlServerAdminPassword - sets the admin password used in development (dev/uat) for the sql server database.
+#   sendGridApiKey - sets the API key for the SendGrid Account used to send emails.
+#   coreDbConnectionStringProd - Connection string to the core API database
+#   adminBackgroundClientSecret - sets the admin background client secret
+
+parameters:
+  - name: disableTests
+    displayName: Disable unit tests
+    default: false
+    type: boolean
+  - name: forceDeploymentToDevelopmentEnvironment
+    displayName: Force deployment to development environment
+    default: false
+    type: boolean
+  - name: forceDeploymentToUatEnvironment
+    displayName: Force deployment to uat environment
+    default: false
+    type: boolean
+
+variables:
+  developmentSubscriptionName: 'd8f6ad62-de82-42f6-98e6-a5cc04cae4e0'
+  developmentConnectedServiceName: 'Digital Solutions Team - Dev/UAT'
+  producationSubscriptionName: '2e1a89e4-4d68-4263-9be9-0b4411f3cc05'
+  producationConnectedServiceName: 'Tracerco Live Subscription'
+  singleSignOnBaseUrl: 'https://sso.tracerco.com'
+  singleSignOnManagementClientId: 'dosevision-iam-prd'
+  singleSignOnManagementClientSecret: '98zq9MKJKATVyBEuQbjDjG2QoSFFqF8y4ttu1NX2dpizIsYRL2'
+
+  isGitFlowDevBranch: ${{ or(eq(variables['Build.SourceBranch'], 'refs/heads/develop'), parameters['forceDeploymentToDevelopmentEnvironment']) }}
+  isGitFlowUatBranch: $[ or( ${{parameters.forceDeploymentToUatEnvironment}}, and(startsWith(variables['System.PullRequest.SourceBranch'], 'refs/heads/release/'), eq(variables['System.PullRequest.TargetBranch'], 'refs/heads/main'))) ]
+  isGitFlowProdBranch: ${{ eq(variables['Build.SourceBranch'], 'refs/heads/main') }}
+  deployArtifacts: ${{ or(eq(variables.isGitFlowDevBranch, 'True'), eq(variables.isGitFlowUatBranch, 'True'), eq(variables.isGitFlowProdBranch, 'True')) }}
+
+trigger:
+  batch: true
+  branches:
+    include:
+    - develop
+    - main
+  paths:
+    exclude:
+    - docs/* # we do not want to trigger a build just because the docs changed.
+
+## Disable schedules for now, as we are not using them.
+#schedules:
+#- cron: "0 0 * * *"
+#  displayName: Daily midnight build
+#  branches:
+#    include:
+#    - develop
+#    - main
+
+stages:
+  - stage: build_customer_ui
+    displayName: 'Build DoseVision API'
+    jobs:
+      - template: dotnetcore-build.yaml
+        parameters:
+          dotnetsdks:
+            - '9.0.x'
+          nugetConfigPath: 'nuget.config'
+          dotNetTestProjects: '**/tests/**/*.csproj'
+          dotNetPublishProjects: '**/src/**/*.csproj'
+          runtests: ${{not(parameters.disableTests)}}
+          postBuildSteps:
+            - script: |
+                dotnet user-secrets set "TracercoIdentityClient:BaseUrl" "NOT-USED-BY-TEST" --project "./src/Tracerco.DoseVision.Api"
+                dotnet user-secrets set "TracercoIdentityClient:ClientId" "NOT-USED-BY-TEST" --project "./src/Tracerco.DoseVision.Api"
+                dotnet user-secrets set "TracercoIdentityClient:ClientSecret" "NOT-USED-BY-TEST" --project "./src/Tracerco.DoseVision.Api"
+                dotnet user-secrets set "TracercoIdentityClient:OverrideTokenEndpoint" "true" --project "./src/Tracerco.DoseVision.Api"
+                dotnet user-secrets set "TracercoIdentityClient:AddScopesToTokenRequest" "false" --project "./src/Tracerco.DoseVision.Api"
+                docker run -e "ACCEPT_EULA=Y" -e "MSSQL_SA_PASSWORD=Pass@word" \
+                    -p 1433:1433 --name sql-server --hostname sql-server \
+                    -d mcr.microsoft.com/mssql/server:2022-latest
+                echo '##vso[task.setvariable variable=ConnectionStrings__DefaultConnection]Server=localhost,1433;Database=dosevision-api-testing;User Id=sa;Password=Pass@word;TrustServerCertificate=True'
+          artifacts:
+            - name: 'api-application'
+              displayName: 'API Application'
+              publishLocation: '$(Build.ArtifactStagingDirectory)/Tracerco.DoseVision.Api.zip'
+            - name: 'background-application'
+              displayName: 'Background Application'
+              publishLocation: '$(Build.ArtifactStagingDirectory)/Tracerco.DoseVision.BackgroundApplication.zip'
+            - name: 'bicep-template'
+              displayName: 'publish Azure Resource Management template (bicep)'
+              publishLocation: 'iac/azure/'
+
+  - stage: deploy_to_dev
+    displayName: 'Release to Dev Environment'
+    dependsOn: build_customer_ui
+    condition: and(succeeded(), eq(variables.isGitFlowDevBranch, 'True'))
+    jobs:
+      - deployment: Deploy
+        environment: 'dosevision-staging'
+        pool:
+          vmImage: 'ubuntu-latest'
+        displayName: 'Deploying to environment'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+              - task: AzureResourceManagerTemplateDeployment@3
+                inputs:
+                  deploymentScope: 'Subscription'
+                  azureResourceManagerConnection: ${{ variables.developmentConnectedServiceName }}
+                  location: 'uksouth'
+                  csmFile: '$(Pipeline.Workspace)/bicep-template/dosevision.bicep'
+                  deploymentOutputs: deploymentOutputs
+                  overrideParameters: -environment dev -tracercoIdentityUrl https://sso.tracerco.com -tracercoIdentityClientId dosevision-iam-dev -tracercoIdentitySecret K6%EGa!7DFw3UeCEgLnF!$W0&9tILHV$ -supportEmail rob.marwood@tracerco.com
+              - pwsh: |
+                  $outputsObject = $env:ARM_OUTPUTS | ConvertFrom-Json
+                  Write-Host "##vso[task.setvariable variable=someResourceUriPwsh]$($outputsObject.apiWebAppName.value)"
+                  Write-Host "##vso[task.setvariable variable=functionAppName]$($outputsObject.functionAppName.value)"
+                displayName: 'Parse ARM deploymentOutputs | pwsh'
+                env:
+                  ARM_OUTPUTS: $(deploymentOutputs)
+              - task: AzureAppServiceManage@0
+                inputs:
+                  azureSubscription: ${{ variables.developmentConnectedServiceName }}
+                  Action: 'Stop Azure App Service'
+                  WebAppName: $(someResourceUriPwsh)
+
+              - task: AzureRmWebAppDeployment@4
+                displayName: Deploy Identity Api Web Application
+                inputs:
+                  ConnectionType: 'AzureRM'
+                  azureSubscription:  ${{ variables.developmentConnectedServiceName }}
+                  appType: 'webApp'
+                  WebAppName: $(someResourceUriPwsh)
+                  packageForLinux: '$(Pipeline.Workspace)/api-application/Tracerco.DoseVision.Api.zip'
+              - task: AzureFunctionApp@1
+                displayName: Deploy Admin Background Function Application
+                inputs:
+                  connectionType: 'AzureRM'
+                  azureSubscription: ${{ variables.developmentConnectedServiceName }}
+                  appType: 'functionApp'
+                  appName: $(functionAppName)
+                  package: '$(Pipeline.Workspace)/background-application/Tracerco.DoseVision.BackgroundApplication.zip'
+                  deploymentMethod: 'auto'
+              - task: AzureAppServiceManage@0
+                inputs:
+                  azureSubscription: ${{ variables.developmentConnectedServiceName }}
+                  Action: 'Start Azure App Service'
+                  WebAppName: $(someResourceUriPwsh)
+
+  - stage: deploy_to_uat
+    displayName: 'Release to UAT Environment'
+    dependsOn: build_customer_ui
+    condition: and(succeeded(), eq(variables.isGitFlowUatBranch, 'True'))
+    jobs:
+      - deployment: Deploy
+        environment: 'dosevision-staging'
+        pool:
+          vmImage: 'ubuntu-latest'
+        displayName: 'Deploying to environment'
+
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+              - task: AzureResourceManagerTemplateDeployment@3
+                inputs:
+                  deploymentScope: 'Subscription'
+                  azureResourceManagerConnection: ${{ variables.developmentConnectedServiceName }}
+                  location: 'uksouth'
+                  csmFile: '$(Pipeline.Workspace)/bicep-template/dosevision.bicep'
+                  deploymentOutputs: deploymentOutputs
+                  overrideParameters: -environment uat -tracercoIdentityUrl https://sso.tracerco.com -tracercoIdentityClientId dosevision-iam-uat -tracercoIdentitySecret K6%EGa!7DFw3UeCEgLnF!$W0&9tILHV$ -supportEmail rob.marwood@tracerco.com
+              - pwsh: |
+                  $outputsObject = $env:ARM_OUTPUTS | ConvertFrom-Json
+                  Write-Host "##vso[task.setvariable variable=someResourceUriPwsh]$($outputsObject.apiWebAppName.value)"
+                  Write-Host "##vso[task.setvariable variable=functionAppName]$($outputsObject.functionAppName.value)"
+                displayName: 'Parse ARM deploymentOutputs | pwsh'
+                env:
+                  ARM_OUTPUTS: $(deploymentOutputs)
+              - task: AzureAppServiceManage@0
+                inputs:
+                  azureSubscription: ${{ variables.developmentConnectedServiceName }}
+                  Action: 'Stop Azure App Service'
+                  WebAppName: $(someResourceUriPwsh)
+              - task: AzureRmWebAppDeployment@4
+                displayName: Deploy Identity Api Web Application
+                inputs:
+                  ConnectionType: 'AzureRM'
+                  azureSubscription:  ${{ variables.developmentConnectedServiceName }}
+                  appType: 'webApp'
+                  WebAppName: $(someResourceUriPwsh)
+                  packageForLinux: '$(Pipeline.Workspace)/api-application/Tracerco.DoseVision.Api.zip'
+              - task: AzureFunctionApp@1
+                displayName: Deploy Admin Background Function Application
+                inputs:
+                  connectionType: 'AzureRM'
+                  azureSubscription: ${{ variables.developmentConnectedServiceName }}
+                  appType: 'functionApp'
+                  appName: $(functionAppName)
+                  package: '$(Pipeline.Workspace)/background-application/Tracerco.DoseVision.BackgroundApplication.zip'
+                  deploymentMethod: 'auto'
+              - task: AzureAppServiceManage@0
+                inputs:
+                  azureSubscription: ${{ variables.developmentConnectedServiceName }}
+                  Action: 'Start Azure App Service'
+                  WebAppName: $(someResourceUriPwsh)
+
+  - stage: deploy_to_prd
+    displayName: 'Release to Production Environment'
+    dependsOn: build_customer_ui
+    condition: and(succeeded(), eq(variables.isGitFlowProdBranch, 'True'))
+    jobs:
+      - deployment: Deploy
+        environment: 'dosevision-staging'
+        pool:
+          vmImage: 'ubuntu-latest'
+        displayName: 'Deploying to environment'
+
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+              - task: AzureResourceManagerTemplateDeployment@3
+                inputs:
+                  deploymentScope: 'Subscription'
+                  azureResourceManagerConnection: ${{ variables.producationConnectedServiceName }}
+                  location: 'uksouth'
+                  csmFile: '$(Pipeline.Workspace)/bicep-template/dosevision.bicep'
+                  deploymentOutputs: deploymentOutputs
+                  overrideParameters: -environment prod -CNAME dosevision.tracerco.com -openIdAuthority https://sso.tracerco.com -openIdMetadataAddress https://sso.tracerco.com/oidc/.well-known/openid-configuration -tracercoIdentityUrl https://sso.tracerco.com -tracercoIdentityClientId dosevision-iam-prd -tracercoIdentitySecret $(singleSignOnManagementClientSecret)
+              - pwsh: |
+                  $outputsObject = $env:ARM_OUTPUTS | ConvertFrom-Json
+                  Write-Host "##vso[task.setvariable variable=someResourceUriPwsh]$($outputsObject.apiWebAppName.value)"
+                  Write-Host "##vso[task.setvariable variable=functionAppName]$($outputsObject.functionAppName.value)"
+                displayName: 'Parse ARM deploymentOutputs | pwsh'
+                env:
+                  ARM_OUTPUTS: $(deploymentOutputs)
+
+              - task: AzureAppServiceManage@0
+                inputs:
+                  azureSubscription: ${{ variables.producationConnectedServiceName }}
+                  Action: 'Stop Azure App Service'
+                  WebAppName: $(someResourceUriPwsh)
+
+              - task: AzureRmWebAppDeployment@4
+                displayName: Deploy Identity Api Web Application
+                inputs:
+                  ConnectionType: 'AzureRM'
+                  azureSubscription:  ${{ variables.producationConnectedServiceName }}
+                  appType: 'webApp'
+                  WebAppName: $(someResourceUriPwsh)
+                  packageForLinux: '$(Pipeline.Workspace)/api-application/Tracerco.DoseVision.Api.zip'
+
+              - task: AzureFunctionApp@1
+                displayName: Deploy Admin Background Function Application
+                inputs:
+                  connectionType: 'AzureRM'
+                  azureSubscription: ${{ variables.producationConnectedServiceName }}
+                  appType: 'functionApp'
+                  appName: $(functionAppName)
+                  package: '$(Pipeline.Workspace)/background-application/Tracerco.DoseVision.BackgroundApplication.zip'
+                  deploymentMethod: 'auto'
+
+              - task: AzureAppServiceManage@0
+                inputs:
+                  azureSubscription: ${{ variables.producationConnectedServiceName }}
+                  Action: 'Start Azure App Service'
+                  WebAppName: $(someResourceUriPwsh)

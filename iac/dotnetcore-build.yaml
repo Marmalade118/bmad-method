@@ -1,0 +1,128 @@
+parameters:
+  - name: nugetConfigPath
+    type: string
+    default:
+  - name: artifacts
+    type: object
+    default: {}
+  - name: dotnetsdks
+    type: object
+    default:
+      - '9.0.x'
+  - name: vmImage
+    type: string
+    default: 'ubuntu-latest'
+  - name: publishArtifacts
+    type: boolean
+    default: true
+  - name: runtests
+    type: boolean
+    default: false
+  - name: buildConfiguration
+    type: string
+    default: 'Release'
+  - name: dotNetTestProjects
+    type: string
+    default: '**/*.csproj'
+  - name: dotNetPublishProjects
+    type: string
+    default: '**/*.csproj'
+  - name: postBuildSteps
+    type: stepList
+    default: []
+
+jobs:
+  - job: Build
+    displayName: 'Build .NET Application (${{ parameters.buildConfiguration }})'
+    pool:
+      vmImage: ${{ parameters.vmImage }}
+    variables:
+      buildConfiguration: ${{ parameters.buildConfiguration }}
+      testOutputDirectory: '$(Agent.TempDirectory)/testresults'
+
+    steps:
+      - script: echo Beginning a CI build with ${{ parameters.buildConfiguration }} configuration
+        displayName: 'Build Info'
+
+      - ${{ each value in parameters.dotnetsdks }}:
+          - task: UseDotNet@2
+            displayName: 'Installing .Net SDK v${{ value }}'
+            inputs:
+              packageType: 'sdk'
+              version: '${{ value }}'
+
+      - task: NuGetAuthenticate@1
+        displayName: 'NuGet Authenticate'
+
+      - task: Cache@2
+        inputs:
+          key: 'nuget | "$(Agent.OS)" | **/packages.lock.json,**/paket.lock,**/packages.props'
+          restoreKeys: |
+            nuget | "$(Agent.OS)"
+          path: ~/.nuget/packages
+        displayName: 'Cache NuGet packages'
+
+      - task: DotNetCoreCLI@2
+        displayName: 'Restore NuGet Packages'
+        inputs:
+          projects: '**/*.csproj'
+          command: restore
+          feedsToUse: config
+          nugetConfigPath: '${{ parameters.nugetConfigPath }}'
+          includeNuGetOrg: true
+
+      - task: DotNetCoreCLI@2
+        displayName: 'Build All Projects'
+        inputs:
+          projects: '**/*.sln'
+          arguments: '--configuration $(buildConfiguration) --no-restore'
+
+      - ${{ each step in parameters.postBuildSteps }}:
+          - ${{ step }}
+
+      - ${{ if eq(parameters.runtests, 'True') }}:
+          - task: DotNetCoreCLI@2
+            displayName: 'Run All Test Projects'
+            inputs:
+              command: test
+              projects: ${{ parameters.dotNetTestProjects }}
+              publishTestResults: false
+              arguments: '--no-restore --no-build --configuration $(buildConfiguration) --logger trx --logger "console;verbosity=normal" --collect:"XPlat Code Coverage" --results-directory $(testOutputDirectory)'
+          - task: PublishTestResults@2
+            displayName: 'Publish Test Results'
+            inputs:
+              testResultsFormat: VSTest
+              testResultsFiles: '*.trx'
+              searchFolder: $(testOutputDirectory)
+              testRunTitle: 'Test Results - ${{ parameters.buildConfiguration }}'
+          - task: reportgenerator@4
+            displayName: 'Generate Code Coverage'
+            inputs:
+              reports: '$(testOutputDirectory)/*/coverage.cobertura.xml'
+              targetdir: '$(testOutputDirectory)/mergedcoveragereport'
+              reporttypes: 'Cobertura;SonarQube;HtmlInline_AzurePipelines'
+              assemblyfilters: '-*Tests*'
+              filefilters: '-*/Migrations/*.cs'
+          - task: PublishCodeCoverageResults@1
+            displayName: 'Publish Code Coverage'
+            inputs:
+              codeCoverageTool: 'Cobertura'
+              summaryFileLocation: '$(testOutputDirectory)/mergedcoveragereport/Cobertura.xml'
+              reportDirectory: '$(testOutputDirectory)/mergedcoveragereport'
+
+      - ${{ if eq(parameters.publishArtifacts, 'True') }}:
+          - task: DotNetCoreCLI@2
+            displayName: 'Publish Projects (${{ parameters.buildConfiguration }})'
+            inputs:
+              command: publish
+              projects: ${{ parameters.dotNetPublishProjects }}
+              arguments: '--no-build --no-restore --configuration $(buildConfiguration) --output $(Build.ArtifactStagingDirectory)'
+              zipAfterPublish: True
+              publishWebProjects: False
+          - ${{ each value in parameters.artifacts }}:
+              - task: PublishBuildArtifacts@1
+                displayName: '${{ value.displayName }}'
+                inputs:
+                  PathtoPublish: '${{ value.publishLocation }}'
+                  ArtifactName: '${{ value.name }}-${{ parameters.buildConfiguration }}'
+                  publishLocation: 'Container'

@@ -18,7 +18,7 @@ env:
   MANAGED_IDENTITY_NAME: bmad-uami
 
 jobs:
-  provision-infra:
+  provision-infrastructure:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     outputs:
@@ -141,8 +141,110 @@ jobs:
             --query connectionString -o tsv)
           echo "storage-connection=$STORAGE_CONNECTION" >> $GITHUB_OUTPUT
 
+  build-and-deploy-dev:
+    needs: provision-infrastructure
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: dev
+      url: https://${{ env.WEB_APP_NAME }}-dev.azurewebsites.net
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+          dotnet-quality: "ga"
+
+      - name: Restore, Build & Test
+        run: |
+          dotnet restore --verbosity minimal
+          dotnet build --configuration Release --no-restore --verbosity minimal
+          dotnet test --configuration Release --no-build --verbosity minimal --logger trx --results-directory TestResults/
+
+      - name: Publish application
+        run: |
+          dotnet publish --configuration Release --no-build --output ./publish --verbosity minimal
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Deploy to Dev Slot
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ env.WEB_APP_NAME }}
+          slot-name: dev
+          package: ./publish
+        env:
+          AZURE_WEBAPP_PUBLISH_PROFILE: ${{ secrets.DEV_PUBLISH_PROFILE }}
+
+      - name: Health check - Dev
+        run: |
+          for i in 1 2 3 4 5; do
+            code=$(curl -s -o /dev/null -w "%{http_code}" https://${{ env.WEB_APP_NAME }}-dev.azurewebsites.net/health) && [ "$code" = "200" ] && exit 0
+            sleep 10
+          done
+          exit 1
+
+  build-and-deploy-uat:
+    needs: build-and-deploy-dev
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: uat
+      url: https://${{ env.WEB_APP_NAME }}-staging.azurewebsites.net
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+          dotnet-quality: "ga"
+
+      - name: Restore, Build & Test
+        run: |
+          dotnet restore --verbosity minimal
+          dotnet build --configuration Release --no-restore --verbosity minimal
+          dotnet test --configuration Release --no-build --verbosity minimal --logger trx --results-directory TestResults/
+
+      - name: Publish application
+        run: |
+          dotnet publish --configuration Release --no-build --output ./publish --verbosity minimal
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Deploy to UAT Slot
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ env.WEB_APP_NAME }}
+          slot-name: staging
+          package: ./publish
+        env:
+          AZURE_WEBAPP_PUBLISH_PROFILE: ${{ secrets.UAT_PUBLISH_PROFILE }}
+
+      - name: Health check - UAT
+        run: |
+          for i in 1 2 3 4 5; do
+            code=$(curl -s -o /dev/null -w "%{http_code}" https://${{ env.WEB_APP_NAME }}-staging.azurewebsites.net/health) && [ "$code" = "200" ] && exit 0
+            sleep 10
+          done
+          exit 1
+
   build-and-deploy:
-    needs: provision-infra
+    needs: build-and-deploy-uat
     runs-on: ubuntu-latest
     timeout-minutes: 20
     environment:
@@ -201,7 +303,6 @@ jobs:
         uses: azure/login@v2
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
-          enable-AzPSSession: true
 
       - name: Deploy to Staging Slot
         uses: azure/webapps-deploy@v3

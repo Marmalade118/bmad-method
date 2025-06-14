@@ -1,0 +1,23 @@
+{
+  "name": "bmad-method",
+  "version": "1.0.0",
+  "description": "There are lots of docs here, but I HIGHLY suggest you just try the Web Agent - it takes just a few minutes to set up in Gemini - and you can use the BMad Agent to explain how this method works, how to set up in the IDE, how to set up in the Web, what should be done in the web or ide (although you can choose your own path also!) - all just by talking to the bmad agent!",
+  "homepage": "https://github.com/Marmalade118/bmad-method#readme",
+  "bugs": {
+    "url": "https://github.com/Marmalade118/bmad-method/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Marmalade118/bmad-method.git"
+  },
+  "license": "ISC",
+  "author": "",
+  "type": "commonjs",
+  "main": "build-web-agent.cfg.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  }
+}
