@@ -1,0 +1,287 @@
+name: Azure CI/CD
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  AZURE_LOCATION: eastus
+  STORAGE_ACCOUNT_NAME: bmadstorageacct
+  REDIS_NAME: bmadRedis
+  APP_SERVICE_PLAN: bmad-app-plan
+  WEB_APP_NAME: bmad-webapp
+  MANAGED_IDENTITY_NAME: bmad-uami
+
+jobs:
+  provision-infra:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    outputs:
+      resource-group: ${{ steps.set-outputs.outputs.resource-group }}
+      storage-connection: ${{ steps.set-outputs.outputs.storage-connection }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+          enable-AzPSSession: true
+
+      - name: Validate Azure credentials
+        run: |
+          az account show --output table
+          echo "✅ Azure login successful"
+      - name: Create Resource Group
+        run: |
+          echo "🚀 Creating resource group: ${{ secrets.RG_NAME }}"
+          az group create \
+            --name ${{ secrets.RG_NAME }} \
+            --location ${{ env.AZURE_LOCATION }} \
+            --tags Environment=Production Project=BMAD CreatedBy=GitHubActions
+
+      - name: Provision Storage Account
+        run: |
+          echo "📦 Creating storage account: ${{ env.STORAGE_ACCOUNT_NAME }}"
+          az storage account create \
+            --name ${{ env.STORAGE_ACCOUNT_NAME }} \
+            --resource-group ${{ secrets.RG_NAME }} \
+            --sku Standard_LRS \
+            --kind StorageV2 \
+            --location ${{ env.AZURE_LOCATION }} \
+            --allow-blob-public-access false \
+            --min-tls-version TLS1_2 \
+            --tags Environment=Production Project=BMAD
+
+          echo "📁 Creating storage containers"
+          export AZURE_STORAGE_CONNECTION_STRING=$(az storage account show-connection-string \
+            --name ${{ env.STORAGE_ACCOUNT_NAME }} \
+            --resource-group ${{ secrets.RG_NAME }} \
+            --query connectionString -o tsv)
+
+          for container in tasks checklists data templates; do
+            az storage container create --name $container --public-access off
+            echo "✅ Created container: $container"
+          done
+
+      - name: Provision Redis Cache
+        run: |
+          echo "🔴 Creating Redis cache: ${{ env.REDIS_NAME }}"
+          az redis create \
+            --name ${{ env.REDIS_NAME }} \
+            --resource-group ${{ secrets.RG_NAME }} \
+            --sku Standard \
+            --vm-size C1 \
+            --location ${{ env.AZURE_LOCATION }} \
+            --minimum-tls-version 1.2 \
+            --tags Environment=Production Project=BMAD
+
+      - name: Provision App Service
+        run: |
+          echo "🌐 Creating App Service Plan: ${{ env.APP_SERVICE_PLAN }}"
+          az appservice plan create \
+            --name ${{ env.APP_SERVICE_PLAN }} \
+            --resource-group ${{ secrets.RG_NAME }} \
+            --sku P1v2 \
+            --is-linux false \
+            --location ${{ env.AZURE_LOCATION }} \
+            --tags Environment=Production Project=BMAD
+
+          echo "🚀 Creating Web App: ${{ env.WEB_APP_NAME }}"
+          az webapp create \
+            --name ${{ env.WEB_APP_NAME }} \
+            --plan ${{ env.APP_SERVICE_PLAN }} \
+            --resource-group ${{ secrets.RG_NAME }} \
+            --runtime "DOTNET|8.0" \
+            --tags Environment=Production Project=BMAD
+
+          echo "🎭 Creating staging slot"
+          az webapp deployment slot create \
+            --name ${{ env.WEB_APP_NAME }} \
+            --resource-group ${{ secrets.RG_NAME }} \
+            --slot staging
+
+          echo "🔄 Configuring auto-swap"
+          az webapp deployment slot auto-swap \
+            --name ${{ env.WEB_APP_NAME }} \
+            --resource-group ${{ secrets.RG_NAME }} \
+            --slot staging \
+            --target-slot production
+
+      - name: Provision Managed Identity
+        run: |
+          echo "🔐 Creating managed identity: ${{ env.MANAGED_IDENTITY_NAME }}"
+          az identity create \
+            --name ${{ env.MANAGED_IDENTITY_NAME }} \
+            --resource-group ${{ secrets.RG_NAME }} \
+            --location ${{ env.AZURE_LOCATION }} \
+            --tags Environment=Production Project=BMAD
+
+          echo "🔗 Assigning identity to web app"
+          az webapp identity assign \
+            --resource-group ${{ secrets.RG_NAME }} \
+            --name ${{ env.WEB_APP_NAME }} \
+            --identities /subscriptions/${{ secrets.SUBSCRIPTION_ID }}/resourceGroups/${{ secrets.RG_NAME }}/providers/Microsoft.ManagedIdentity/userAssignedIdentities/${{ env.MANAGED_IDENTITY_NAME }}
+
+      - name: Set job outputs
+        id: set-outputs
+        run: |
+          echo "resource-group=${{ secrets.RG_NAME }}" >> $GITHUB_OUTPUT
+          STORAGE_CONNECTION=$(az storage account show-connection-string \
+            --name ${{ env.STORAGE_ACCOUNT_NAME }} \
+            --resource-group ${{ secrets.RG_NAME }} \
+            --query connectionString -o tsv)
+          echo "storage-connection=$STORAGE_CONNECTION" >> $GITHUB_OUTPUT
+
+  build-and-deploy:
+    needs: provision-infra
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: production
+      url: https://${{ env.WEB_APP_NAME }}.azurewebsites.net
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+          dotnet-quality: "ga"
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
+      - name: Restore dependencies
+        run: dotnet restore --verbosity minimal
+
+      - name: Build application
+        run: |
+          echo "🔨 Building application..."
+          dotnet build --configuration Release --no-restore --verbosity minimal
+          echo "✅ Build completed successfully"
+
+      - name: Run tests
+        run: |
+          echo "🧪 Running tests..."
+          dotnet test --configuration Release --no-build --verbosity minimal --logger trx --results-directory TestResults/
+          echo "✅ Tests completed successfully"
+
+      - name: Publish test results
+        uses: dorny/test-reporter@v1
+        if: always()
+        with:
+          name: .NET Tests
+          path: TestResults/*.trx
+          reporter: dotnet-trx
+
+      - name: Publish application
+        run: |
+          echo "📦 Publishing application..."
+          dotnet publish --configuration Release --no-build --output ./publish --verbosity minimal
+          echo "✅ Publish completed successfully"
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+          enable-AzPSSession: true
+
+      - name: Deploy to Staging Slot
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ env.WEB_APP_NAME }}
+          slot-name: staging
+          package: ./publish
+        env:
+          AZURE_WEBAPP_PUBLISH_PROFILE: ${{ secrets.STAGING_PUBLISH_PROFILE }}
+
+      - name: Wait for deployment
+        run: |
+          echo "⏳ Waiting for deployment to complete..."
+          sleep 30
+
+      - name: Health check - Staging
+        run: |
+          echo "🏥 Performing health check on staging slot..."
+          max_attempts=5
+          attempt=1
+
+          while [ $attempt -le $max_attempts ]; do
+            echo "Attempt $attempt of $max_attempts"
+            if curl -f -s --max-time 30 "https://${{ env.WEB_APP_NAME }}-staging.azurewebsites.net/health"; then
+              echo "✅ Health check passed"
+              break
+            else
+              echo "❌ Health check failed, retrying in 10 seconds..."
+              sleep 10
+              attempt=$((attempt + 1))
+            fi
+          done
+
+          if [ $attempt -gt $max_attempts ]; then
+            echo "❌ Health check failed after $max_attempts attempts"
+            exit 1
+          fi
+
+      - name: Swap Staging to Production
+        run: |
+          echo "🔄 Swapping staging to production..."
+          az webapp deployment slot swap \
+            --resource-group ${{ needs.provision-infra.outputs.resource-group }} \
+            --name ${{ env.WEB_APP_NAME }} \
+            --slot staging \
+            --target-slot production
+          echo "✅ Swap completed successfully"
+
+      - name: Health check - Production
+        run: |
+          echo "🏥 Performing final health check on production..."
+          sleep 15
+          max_attempts=3
+          attempt=1
+
+          while [ $attempt -le $max_attempts ]; do
+            echo "Attempt $attempt of $max_attempts"
+            if curl -f -s --max-time 30 "https://${{ env.WEB_APP_NAME }}.azurewebsites.net/health"; then
+              echo "✅ Production health check passed"
+              break
+            else
+              echo "❌ Production health check failed, retrying in 10 seconds..."
+              sleep 10
+              attempt=$((attempt + 1))
+            fi
+          done
+
+          if [ $attempt -gt $max_attempts ]; then
+            echo "❌ Production health check failed after $max_attempts attempts"
+            echo "🚨 Consider rolling back the deployment"
+            exit 1
+          fi
+
+      - name: Cleanup old deployments
+        if: success()
+        run: |
+          echo "🧹 Cleaning up old deployment artifacts..."
+          # Keep only the last 5 deployments
+          az webapp deployment list \
+            --resource-group ${{ needs.provision-infra.outputs.resource-group }} \
+            --name ${{ env.WEB_APP_NAME }} \
+            --query '[5:].id' -o tsv | \
+          xargs -r -I {} az webapp deployment delete --ids {}
