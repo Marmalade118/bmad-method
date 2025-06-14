@@ -8,8 +8,13 @@ Write-Host "Generating Foundry config files..."
 
 Get-ChildItem -Path $sourceDir -Filter "*.agent.yaml" | ForEach-Object {
     $destFile = Join-Path $destDir $_.Name
-    Copy-Item -Path $_.FullName -Destination $destFile -Force
-    Write-Host "Copied $($_.Name) to .tooling/agents"
+    try {
+        Copy-Item -Path $_.FullName -Destination $destFile -Force
+        Write-Host "Copied $($_.Name) to .tooling/agents"
+    }
+    catch {
+        Write-Host "Failed to copy $($_.Name): $_" -ForegroundColor Red
+    }
 }
 
 Write-Host "Generation complete. Review .tooling/agents for Foundry-compatible configs."

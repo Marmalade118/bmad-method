@@ -225,11 +225,17 @@ jobs:
 
           while [ $attempt -le $max_attempts ]; do
             echo "Attempt $attempt of $max_attempts"
-            if curl -f -s --max-time 30 "https://${{ env.WEB_APP_NAME }}-staging.azurewebsites.net/health"; then
+            response=$(curl -s -w "%{http_code}" -o response_body.txt --max-time 30 "https://${{ env.WEB_APP_NAME }}-staging.azurewebsites.net/health" || true)
+            http_code="${response: -3}"
+            body=$(cat response_body.txt)
+            if [ "$http_code" -eq 200 ]; then
               echo "✅ Health check passed"
               break
             else
-              echo "❌ Health check failed, retrying in 10 seconds..."
+              echo "❌ Health check failed with HTTP status: $http_code"
+              echo "Response body:"
+              echo "$body"
+              echo "Retrying in 10 seconds..."
               sleep 10
               attempt=$((attempt + 1))
             fi
@@ -259,11 +265,17 @@ jobs:
 
           while [ $attempt -le $max_attempts ]; do
             echo "Attempt $attempt of $max_attempts"
-            if curl -f -s --max-time 30 "https://${{ env.WEB_APP_NAME }}.azurewebsites.net/health"; then
+            response=$(curl -s -w "%{http_code}" -o response_body.txt --max-time 30 "https://${{ env.WEB_APP_NAME }}.azurewebsites.net/health" || true)
+            http_code="${response: -3}"
+            body=$(cat response_body.txt)
+            if [ "$http_code" -eq 200 ]; then
               echo "✅ Production health check passed"
               break
             else
-              echo "❌ Production health check failed, retrying in 10 seconds..."
+              echo "❌ Production health check failed with HTTP status: $http_code"
+              echo "Response body:"
+              echo "$body"
+              echo "Retrying in 10 seconds..."
               sleep 10
               attempt=$((attempt + 1))
             fi
